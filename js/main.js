@@ -1,0 +1,93 @@
+const form = document.querySelector(".top-banner form");
+const input = document.querySelector(".top-banner input");
+const msg = document.querySelector(".top-banner .msg");
+const list = document.querySelector(".ajax-section .cities");
+/*SUBSCRIBE HERE FOR API KEY: https://home.openweathermap.org/api_keys*/
+const apiKey = "e310f821df3caaf961605a86d3053f91";
+
+// 阻止表单提交默认事件，防止页面重新加载
+form.addEventListener("submit", (e) => {
+  e.preventDefault();
+  // 拿到用户输入的城市名
+  let inputVal = input.value;
+
+  //收集页面里已有的所有城市项，转为数组
+  const listItems = list.querySelectorAll(".ajax-section .city");
+  const listItemsArray = Array.from(listItems);
+
+  // 已有城市才执行
+  if (listItemsArray.length > 0) {
+    // 在已有城市里筛选
+    const filteredArray = listItemsArray.filter((el) => {
+      let content = "";
+      //如果输入值有逗号，如：shenzhen，cn
+      if (inputVal.includes(",")) {
+        //如果逗号后内容长度>2（无效国家码，如 shenzhen,cnnnn）
+        if (inputVal.split(",")[1].length > 2) {
+          // 那就从逗号截断，只保留城市名
+          inputVal = inputVal.split(",")[0];
+          // 匹配卡片中「城市名文本」
+          content = el
+            .querySelector(".city-name span")
+            .textContent.toLowerCase();
+        } else {
+          //有效国家码，匹配卡片中 data-name 属性「城市+国家码」
+          content = el.querySelector(".city-name").dataset.name.toLowerCase();
+        }
+      } else {
+        // 输入值无逗号，仅匹配卡片中的「城市名文本」
+        content = el.querySelector(".city-name span").textContent.toLowerCase();
+      }
+      // 返回输入值和已有城市的匹配结果
+      return content == inputVal.toLowerCase();
+    });
+
+    // 如果找到重复项，提示用户并终止后续操作
+    if (filteredArray.length > 0) {
+      msg.textContent = `You already know the weather for ${
+        filteredArray[0].querySelector(".city-name span").textContent
+      } ...otherwise be more specific by providing the country code as well 😉`;
+      form.reset();
+      input.focus();
+      return;
+    }
+  }
+
+  //如果没有重复城市，继续执行，准备获取数据
+  const url = `https://api.openweathermap.org/data/2.5/weather?q=${inputVal}&appid=${apiKey}&units=metric`;
+
+  fetch(url)
+    // 把返回的JSON字符串转成JS对象
+    .then((response) => response.json())
+    .then((data) => {
+      const { main, name, sys, weather } = data;
+      const icon = `https://s3-us-west-2.amazonaws.com/s.cdpn.io/162656/${
+        weather[0]["icon"]
+      }.svg`;
+
+      const li = document.createElement("li");
+      li.classList.add("city");
+      const markup = `
+        <h2 class="city-name" data-name="${name},${sys.country}">
+          <span>${name}</span>
+          <sup>${sys.country}</sup>
+        </h2>
+        <div class="city-temp">${Math.round(main.temp)}<sup>°C</sup></div>
+        <figure>
+          <img class="city-icon" src="${icon}" alt="${
+            weather[0]["description"]
+          }">
+          <figcaption>${weather[0]["description"]}</figcaption>
+        </figure>
+      `;
+      li.innerHTML = markup;
+      list.appendChild(li);
+    })
+    .catch(() => {
+      msg.textContent = "Please search for a valid city 😩";
+    });
+
+  msg.textContent = "";
+  form.reset();
+  input.focus();
+});
